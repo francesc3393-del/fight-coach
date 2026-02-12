@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>FIGHT COACH - ULTIMATE</title>
+    <style>
+        :root { --primary: #ff0000; --accent: #f1c40f; --bg: #0a0a0a; --box-bg: #151515; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', Impact, sans-serif; text-align: center; padding-top: 20px; margin: 0; }
+        .box { background: var(--box-bg); display: inline-block; padding: 30px; border-radius: 40px; border: 2px solid #333; box-shadow: 0 0 40px rgba(255, 0, 0, 0.2); width: 90%; max-width: 500px; }
+        #round-info { color: var(--primary); font-size: 20px; margin-bottom: 10px; letter-spacing: 5px; font-weight: 900; }
+        select { background: #222; color: #fff; padding: 15px; border-radius: 12px; border: 1px solid #444; font-size: 16px; width: 100%; margin-bottom: 20px; text-transform: uppercase; }
+        #display-colpo { font-size: 32px; color: #fff; margin: 20px 0; font-weight: 900; height: 220px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; border-radius: 25px; background: radial-gradient(circle, #1a1a1a 0%, #050505 100%); border: 2px solid #222; padding: 20px; transition: 0.1s; line-height: 1.2; text-shadow: 0 0 20px rgba(255,0,0,0.5); }
+        #timer { font-size: 70px; color: var(--accent); font-family: 'Courier New', monospace; font-weight: bold; }
+        #stato { font-size: 22px; color: #444; letter-spacing: 8px; margin-bottom: 25px; font-weight: bold; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        button { padding: 20px; font-size: 18px; cursor: pointer; border: none; border-radius: 15px; font-weight: 900; text-transform: uppercase; }
+        .start { background: linear-gradient(145deg, #1b5e20, #2e7d32); color: white; grid-column: span 2; }
+        .stop { background: linear-gradient(145deg, #b71c1c, #d32f2f); color: white; }
+        .reset { background: #333; color: #bbb; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <div id="round-info">ROUND 1 / 3</div>
+        <select id="modalita" onchange="reset()">
+            <option value="hard">MODALITÀ HARD</option>
+            <option value="reazione_k1">REAZIONE K1</option>
+            <option value="k1_combo">K1 COMBO</option>
+            <option value="reazione_boxe">REAZIONE BOXE</option>
+        </select>
+
+        <div id="stato">READY</div>
+        <div id="display-colpo">--</div>
+        <div id="timer">02:00</div>
+        
+        <div class="controls">
+            <button id="bS" class="start" onclick="preparaRound()">START FIGHT</button>
+            <button id="bT" class="stop" onclick="ferma()" disabled>STOP</button>
+            <button class="reset" onclick="reset()">RESET</button>
+        </div>
+    </div>
+
+    <script>
+        let sec = 120, running = false, pause = false, roundAttuale = 1, timerInt, numTout, startTime;
+        let warmupStep = 0, ultimoTipoColpo = "pugno", audioCtx;
+
+        const comboK1Elite = [
+            "1 + LOW KICK DX", "1-1 + LOW KICK DX", "TEEP SX + 2 + 3", 
+            "2 + LOW KICK SX Interno", "1-2-3 + LOW KICK DX", "1-2 + GINOCCHIATA DX", 
+            "1-2 LUNGO + MIDDLE KICK DX", "1 + SWITCH MIDDLE SX", "5 + 2 + LOW DX", 
+            "6 + 3 + MIDDLE DX", "3 FEGATO + 4 + GINOCCHIATA SX", 
+            "3 + 4 CORPO + SWITCH LOW SX", "1 + MIDDLE KICK DX", 
+            "2 + SWITCH MIDDLE SX", "3 + MIDDLE KICK DX", "TEEP SX + 2", 
+            "1-1 + MIDDLE KICK DX", "1 + MIDDLE DX + 2", "1 + SWITCH GINOCCHIO SX", 
+            "1-2 + GINOCCHIATA DX Avanzata"
+        ];
+
+        const sameArmWork = [
+            "1 + 3", "1 + 5", "2 + 4", "2 + 6",
+            "3 + SWITCH MIDDLE SX", "1 + 3 + 3 FEGATO", "2 + 4 + GINOCCHIO DX"
+        ];
+
+        function playBeep(freq, dur) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = freq; gain.gain.value = 0.1;
+            osc.start(); setTimeout(() => osc.stop(), dur);
+        }
+
+        function parla(testo, rate = 1.3) {
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(testo);
+            msg.lang = 'it-IT'; 
+            msg.rate = rate;
+            window.speechSynthesis.speak(msg);
+        }
+
+        function preparaRound() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            running = true; document.getElementById('bS').disabled = true; document.getElementById('bT').disabled = false;
+            let count = 5; document.getElementById('stato').innerText = "PREPARATI";
+            const display = document.getElementById('display-colpo');
+            display.innerText = count; playBeep(440, 200);
+            const countInt = setInterval(() => {
+                count--;
+                if (count > 0) { display.innerText = count; playBeep(440, 200); } 
+                else { clearInterval(countInt); display.innerText = "FIGHT!"; playBeep(880, 500); setTimeout(avvia, 500); }
+            }, 1000);
+        }
+
+        async function estrai() {
+            if (!running || pause) return;
+            let modo = document.getElementById('modalita').value;
+            let tempoTrascorso = (Date.now() - startTime) / 1000;
+            const display = document.getElementById('display-colpo');
+            let scelta = "";
+            let ritardoNext = 2000;
+
+            if (tempoTrascorso < 7) {
+                scelta = ["1", "2", "1-2", "1-1"][warmupStep % 4];
+                display.innerText = scelta; parla(scelta, 1.4);
+                warmupStep++;
+                numTout = setTimeout(estrai, 2200);
+                return;
+            }
+
+            if (modo === "reazione_boxe") {
+                if ((sec === 120 || sec === 60) && tempoTrascorso > 10) {
+                    display.innerText = "PAUSA ATTIVA";
+                    numTout = setTimeout(estrai, 7000);
+                    return;
+                }
+                scelta = ["1", "2", "3", "4", "5", "6", "1-2"][Math.floor(Math.random() * 7)];
+                display.innerText = scelta; parla(scelta, 1.6);
+                let r = Math.random();
+                if (r < 0.15) ritardoNext = 1000;
+                else ritardoNext = 1800 + (Math.random() * 2200);
+            }
+            else if (modo === "hard") {
+                let r = Math.random();
+                if (r < 0.20) {
+                    let colpi = ["3", "4", "1", "2"];
+                    let colpoScelto = colpi[Math.floor(Math.random() * colpi.length)];
+                    let num = Math.floor(Math.random() * 4) + 4;
+                    scelta = `${num} VOLTE IL ${colpoScelto}`;
+                    display.innerText = scelta; parla(scelta, 1.8);
+                    ritardoNext = 3500 + (num * 300);
+                } else if (r < 0.40) {
+                    scelta = sameArmWork[Math.floor(Math.random() * sameArmWork.length)];
+                    display.innerText = scelta; parla(scelta, 2.1);
+                    ritardoNext = 3200;
+                } else if (r < 0.55) {
+                    let tipoCalcio = ["MIDDLE DX", "MIDDLE SX", "LOW DX"][Math.floor(Math.random() * 3)];
+                    let numCalci = Math.floor(Math.random() * 3) + 2; 
+                    display.innerText = tipoCalcio; parla(tipoCalcio, 1.8);
+                    for(let i=1; i < numCalci; i++) {
+                        setTimeout(() => {
+                            display.innerText = (i === 1) ? "ANCORA!" : (i === 2 ? "TRIPLA!" : "QUADRUPLA!");
+                            parla(display.innerText, 2.2);
+                        }, i * 1300);
+                    }
+                    ritardoNext = (numCalci * 1500) + 500;
+                } else {
+                    scelta = comboK1Elite[Math.floor(Math.random() * comboK1Elite.length)];
+                    display.innerText = scelta; parla(scelta, 2.0);
+                    ritardoNext = 3800;
+                }
+            } 
+            else if (modo === "k1_combo") {
+                scelta = comboK1Elite[Math.floor(Math.random() * comboK1Elite.length)];
+                display.innerText = scelta; parla(scelta, 1.8);
+                ritardoNext = 4000 + (Math.random() * 1500);
+            }
+            else { // reazione_k1
+                let r = Math.random();
+                if (r < 0.40) {
+                    scelta = comboK1Elite[Math.floor(Math.random() * comboK1Elite.length)];
+                    display.innerText = scelta; parla(scelta, 1.9);
+                    ritardoNext = 4200 + (Math.random() * 1000);
+                } else {
+                    if (ultimoTipoColpo === "gamba") {
+                        scelta = ["1", "2", "3", "4"][Math.floor(Math.random() * 4)];
+                        ritardoNext = 1800 + (Math.random() * 1000); ultimoTipoColpo = "pugno";
+                    } else {
+                        scelta = ["LOW KICK DX", "LOW KICK SX", "MIDDLE KICK DX", "MIDDLE KICK SX"][Math.floor(Math.random() * 4)];
+                        ritardoNext = 2600 + (Math.random() * 1000); ultimoTipoColpo = "gamba";
+                    }
+                    display.innerText = scelta; parla(scelta, 1.5);
+                }
+            }
+            numTout = setTimeout(estrai, ritardoNext);
+        }
+
+        function avvia() {
+            let modo = document.getElementById('modalita').value;
+            sec = (modo === "hard") ? 120 : 180;
+            running = true; pause = false; startTime = Date.now(); warmupStep = 0;
+            document.getElementById('stato').innerText = "FIGHT"; document.getElementById('stato').style.color = "#2ecc71";
+            document.getElementById('timer').innerText = (modo === "hard") ? "02:00" : "03:00";
+            ciclo(); estrai();
+        }
+
+        function ciclo() {
+            timerInt = setInterval(() => {
+                if (!running) return;
+                sec--;
+                let m = Math.floor(sec/60), r = sec%60;
+                document.getElementById('timer').innerText = `${m<10?'0'+m:m}:${r<10?'0'+r:r}`;
+                if (sec <= 0) {
+                    clearInterval(timerInt);
+                    if (!pause) { pause = true; sec = 60; document.getElementById('stato').innerText = "PAUSA"; parla("Pausa"); ciclo(); } 
+                    else { roundAttuale++; if (roundAttuale > 3) { reset(); parla("Fine"); } else { pause = false; document.getElementById('round-info').innerText = `ROUND ${roundAttuale} / 3`; preparaRound(); } }
+                }
+            }, 1000);
+        }
+
+        function ferma() { running = false; clearInterval(timerInt); clearTimeout(numTout); document.getElementById('bS').disabled = false; document.getElementById('bT').disabled = true; }
+        function reset() { 
+            ferma(); 
+            let modo = document.getElementById('modalita').value;
+            roundAttuale = 1; 
+            document.getElementById('timer').innerText = (modo === "hard") ? "02:00" : "03:00"; 
+            document.getElementById('display-colpo').innerText = "--"; 
+            document.getElementById('round-info').innerText = "ROUND 1 / 3"; 
+            document.getElementById('stato').innerText = "READY"; 
+        }
+    </script>
+</body>
+</html>
